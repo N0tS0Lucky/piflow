@@ -1,0 +1,25 @@
+{
+  "name": "piflow",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first runtime for multi-agent workflows on the pi SDK",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc",
+    "lint": "eslint . && prettier --check ."
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.3.0",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.68.0",
+    "vitest": "^4.1.11"
+  }
+}
