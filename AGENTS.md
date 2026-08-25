@@ -25,6 +25,8 @@ Do not paste those documents into the prompt. Open the file.
 
 Issue #1 is origin research, not a build task.
 
+**Build:** new branch → implement → PR to `main` with `Closes #<n>`. Review happens in PR comments; merge closes the linked issue.
+
 ## Stack
 
 TypeScript (ESM, `strict`), zod, `yaml`, vitest. One package, modules as `src/<module-id>/`.
