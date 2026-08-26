@@ -218,6 +218,68 @@ steps:
     expect(definitionError.message).toContain("build");
   });
 
+  it("rejects duplicate step ids inside a parallel body with a path", async () => {
+    const dir = await writeDefsDir();
+    await mkdir(join(dir, "workflows"));
+    const file = join(dir, "workflows", "dup-parallel.yaml");
+    await writeFile(
+      file,
+      `
+apiVersion: piflow/v1
+kind: workflow
+name: dup-parallel
+steps:
+  - id: fan-out
+    type: parallel
+    body:
+      - id: ship
+        type: node
+        persona: shipper
+      - id: ship
+        type: node
+        persona: writer
+`,
+      "utf8",
+    );
+
+    const err = await loadDefinitions(dir).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.file).toBe(file);
+    expect(definitionError.path).toMatch(/steps\[0\]\.body\[1\]/);
+    expect(definitionError.message).toContain("ship");
+  });
+
+  it("allows the same step id in different enclosing lists", async () => {
+    const dir = await writeDefsDir();
+    await mkdir(join(dir, "workflows"));
+    await writeFile(
+      join(dir, "workflows", "reuse.yaml"),
+      `
+apiVersion: piflow/v1
+kind: workflow
+name: reuse-ids
+steps:
+  - id: build
+    type: node
+    persona: planner
+  - id: loop
+    type: loop
+    maxIterations: 2
+    body:
+      - id: build
+        type: node
+        persona: builder
+`,
+      "utf8",
+    );
+
+    const graph = await loadDefinitions(dir);
+
+    expect(graph.workflows["reuse-ids"]?.steps).toHaveLength(2);
+  });
+
   it("rejects a workflow file sitting in personas/", async () => {
     const dir = await writeDefsDir();
     await mkdir(join(dir, "personas"));
