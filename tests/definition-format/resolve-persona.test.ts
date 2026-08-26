@@ -47,6 +47,19 @@ async function writeWorkflow(dir: string, yaml: string): Promise<void> {
   await writeFile(join(dir, "workflows", "main.yaml"), yaml, "utf8");
 }
 
+/** Load definitions expecting exactly one DefinitionError; surfaces it on failure. */
+async function captureDefinitionError(dir: string): Promise<DefinitionError> {
+  try {
+    await loadDefinitions(dir);
+  } catch (cause) {
+    if (cause instanceof DefinitionError) return cause;
+    throw new Error(`expected DefinitionError, got ${String(cause)}`, {
+      cause,
+    });
+  }
+  throw new Error("expected loadDefinitions to throw, but it resolved");
+}
+
 describe("loadDefinitions persona resolution", () => {
   it("attaches the linked persona object to top-level node and interactive steps", async () => {
     const dir = await writeDefsDir();
@@ -158,6 +171,80 @@ steps:
     expect(error?.path).toBe("steps[0]");
     expect(error?.message).toContain("assess-plan");
     expect(error?.message).toContain("plan-assessor");
+  });
+
+  it("rejects a persona reference colliding with an inherited Object property", async () => {
+    const dir = await writeDefsDir();
+    await writeWorkflow(
+      dir,
+      `
+apiVersion: piflow/v1
+kind: workflow
+name: build-feature
+steps:
+  - id: assess-plan
+    persona: toString
+`,
+    );
+
+    const error = await captureDefinitionError(dir);
+
+    // `personas.toString` must not resolve via Object.prototype — a dangling
+    // reference stays dangling no matter what it names.
+    expect(error.path).toBe("steps[0]");
+    expect(error.message).toContain("assess-plan");
+    expect(error.message).toContain('"toString"');
+  });
+
+  it("rejects a missing persona inside a loop body, naming the nested path", async () => {
+    const dir = await writeDefsDir();
+    await writeWorkflow(
+      dir,
+      `
+apiVersion: piflow/v1
+kind: workflow
+name: review-loop
+steps:
+  - id: gate-loop
+    type: loop
+    maxIterations: 3
+    body:
+      - id: build
+        persona: ghost-builder
+`,
+    );
+
+    const error = await captureDefinitionError(dir);
+
+    expect(error.path).toBe("steps[0].body[0]");
+    expect(error.message).toContain("build");
+    expect(error.message).toContain("ghost-builder");
+  });
+
+  it("rejects a missing persona inside a parallel body, naming the nested path", async () => {
+    const dir = await writeDefsDir();
+    await writeWorkflow(
+      dir,
+      `
+apiVersion: piflow/v1
+kind: workflow
+name: fan-out
+steps:
+  - id: workers
+    type: parallel
+    body:
+      - id: spin-up
+        type: node
+        persona: ghost-worker
+        worktree: true
+`,
+    );
+
+    const error = await captureDefinitionError(dir);
+
+    expect(error.path).toBe("steps[0].body[0]");
+    expect(error.message).toContain("spin-up");
+    expect(error.message).toContain("ghost-worker");
   });
 
   it("resolves the spec's review-loop example against critic/builder personas", async () => {

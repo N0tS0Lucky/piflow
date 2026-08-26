@@ -49,14 +49,16 @@ export type ResolvedDefinitions = {
 
 /** Attach the referenced persona to every session step at any nesting depth. */
 export function resolveDefinitions(raw: RawDefinitions): ResolvedDefinitions {
-  const personas: Record<string, Persona> = Object.fromEntries(
+  // Map lookups — a bare record would consult Object.prototype and let a step
+  // referencing e.g. `persona: toString` resolve against an inherited function.
+  const personas = new Map<string, Persona>(
     Object.entries(raw.personas).map(([name, entry]) => [
       name,
       entry.definition,
     ]),
   );
   return {
-    personas,
+    personas: Object.fromEntries(personas),
     workflows: Object.fromEntries(
       Object.entries(raw.workflows).map(([name, entry]) => [
         name,
@@ -69,7 +71,7 @@ export function resolveDefinitions(raw: RawDefinitions): ResolvedDefinitions {
 function resolveWorkflow(
   file: string,
   workflow: Workflow,
-  personas: Record<string, Persona>,
+  personas: Map<string, Persona>,
 ): ResolvedWorkflow {
   return {
     ...workflow,
@@ -81,14 +83,14 @@ function resolveSteps(
   file: string,
   path: string,
   steps: Step[],
-  personas: Record<string, Persona>,
+  personas: Map<string, Persona>,
 ): ResolvedStep[] {
   return steps.map((step, index) => {
     const stepPath = `${path}[${index}]`;
     switch (step.type) {
       case "node":
       case "interactive": {
-        const persona = personas[step.persona];
+        const persona = personas.get(step.persona);
         if (!persona) {
           throw new DefinitionError(
             file,
