@@ -72,4 +72,47 @@ steps:
       },
     ]);
   });
+
+  it("loads a parallel of two node steps", async () => {
+    const file = await writeTempYaml(`
+apiVersion: piflow/v1
+kind: workflow
+name: fan-out
+steps:
+  - id: ship-and-docs
+    type: parallel
+    body:
+      - id: ship
+        type: node
+        persona: shipper
+      - id: docs
+        type: node
+        persona: writer
+`);
+
+    const workflow = await loadOne(file);
+
+    expect(workflow.kind).toBe("workflow");
+    if (workflow.kind !== "workflow") return;
+    expect(workflow.steps).toEqual([
+      {
+        id: "ship-and-docs",
+        type: "parallel",
+        body: [
+          {
+            id: "ship",
+            type: "node",
+            persona: "shipper",
+            worktree: false,
+          },
+          {
+            id: "docs",
+            type: "node",
+            persona: "writer",
+            worktree: false,
+          },
+        ],
+      },
+    ]);
+  });
 });

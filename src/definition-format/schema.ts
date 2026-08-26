@@ -78,9 +78,17 @@ export const LoopStepSchema = z.strictObject({
   body: z.array(z.lazy(() => StepSchema)).min(1),
 });
 
+/** `parallel` step. `body` is a non-empty nested step list. */
+export const ParallelStepSchema = z.strictObject({
+  id: z.string(),
+  type: z.literal("parallel"),
+  body: z.array(z.lazy(() => StepSchema)).min(1),
+});
+
 const StepUnionSchema = z.discriminatedUnion("type", [
   SessionStepSchema,
   LoopStepSchema,
+  ParallelStepSchema,
 ]);
 
 function withDefaultNodeType(value: unknown): unknown {
