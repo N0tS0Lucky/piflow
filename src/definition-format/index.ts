@@ -3,6 +3,7 @@ export { DefinitionError } from "./errors.js";
 export { loadDefinitions, loadOne } from "./load.js";
 export type { ResolvedDefinitions } from "./resolve.js";
 export type {
+  ResolvedInvokeStep,
   ResolvedLoopStep,
   ResolvedParallelStep,
   ResolvedSessionStep,
