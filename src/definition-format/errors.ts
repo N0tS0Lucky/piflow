@@ -66,21 +66,45 @@ function nearestKey(
   return bestDistance <= SUGGESTION_DISTANCE ? best : undefined;
 }
 
+/** Object / array schemas we can walk to find the keys valid at a path. */
+type WalkableSchema = {
+  readonly def: { readonly type?: string; readonly shape?: Record<string, WalkableSchema>; readonly element?: WalkableSchema };
+};
+
+/** Keys accepted by the object schema at `path`, or empty if that node is not an object. */
+function knownKeysAt(
+  schema: WalkableSchema,
+  path: readonly PropertyKey[],
+): readonly string[] {
+  let node: WalkableSchema = schema;
+  for (const part of path) {
+    if (node.def.type === "array" && node.def.element) {
+      node = node.def.element;
+      continue;
+    }
+    const next = node.def.shape?.[String(part)];
+    if (!next) return [];
+    node = next;
+  }
+  return node.def.shape ? Object.keys(node.def.shape) : [];
+}
+
 /**
  * Wrap a raw zod failure as the module's DefinitionError. Raw zod errors never
  * escape; unrecognized keys get an author-facing message naming the key and a
- * "did you mean" hint against knownKeys when Levenshtein-close.
+ * "did you mean" hint against keys valid at the issue path when Levenshtein-close.
  */
 export function mapZodError(
   file: string,
   error: z.core.$ZodError,
-  knownKeys: readonly string[],
+  schema: WalkableSchema,
 ): DefinitionError {
   const issue = error.issues[0];
   const path = formatZodPath(issue.path);
   if (issue.code !== "unrecognized_keys") {
     return new DefinitionError(file, path, issue.message);
   }
+  const knownKeys = knownKeysAt(schema, issue.path);
   const segments = issue.keys.map((key) => {
     const nearest = nearestKey(String(key), knownKeys);
     return nearest

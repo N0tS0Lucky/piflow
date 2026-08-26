@@ -21,7 +21,7 @@ export async function loadOne(filePath: string): Promise<Persona> {
 
   const result = PersonaSchema.safeParse(data);
   if (!result.success) {
-    throw mapZodError(filePath, result.error, Object.keys(PersonaSchema.shape));
+    throw mapZodError(filePath, result.error, PersonaSchema);
   }
   return result.data;
 }

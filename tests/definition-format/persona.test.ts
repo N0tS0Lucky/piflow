@@ -102,6 +102,54 @@ systemPromptAppend: Be brief.
     expect(definitionError.message).toContain('did you mean "description"');
   });
 
+  it("hints a nested unknown key against keys valid at that level, not the top level", async () => {
+    const file = await writeTempYaml(`
+apiVersion: piflow/v1
+kind: persona
+name: critic
+description: Reviews diffs.
+skills: []
+tools:
+  nam: oops
+  allow: []
+  deny: []
+model: auto
+systemPromptAppend: Be brief.
+`);
+
+    const err = await loadOne(file).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.path).toBe("tools");
+    expect(definitionError.message).toContain("nam");
+    expect(definitionError.message).not.toContain('did you mean "name"');
+  });
+
+  it("hints a nested typo against the keys valid at that level", async () => {
+    const file = await writeTempYaml(`
+apiVersion: piflow/v1
+kind: persona
+name: critic
+description: Reviews diffs.
+skills: []
+tools:
+  allow: [read]
+  deny: []
+  alow: [read]
+model: auto
+systemPromptAppend: Be brief.
+`);
+
+    const err = await loadOne(file).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.path).toBe("tools");
+    expect(definitionError.message).toContain("alow");
+    expect(definitionError.message).toContain('did you mean "allow"');
+  });
+
   it("rejects an unrelated unknown key without inventing a suggestion", async () => {
     const file = await writeTempYaml(`
 apiVersion: piflow/v1
