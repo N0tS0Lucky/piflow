@@ -85,4 +85,26 @@ describe("loadOne (persona)", () => {
     expect(definitionError.message).toContain("systemPromptReplace");
     expect(definitionError.message).toContain("systemPromptAppend");
   });
+
+  it("wraps syntactically invalid YAML in a DefinitionError", async () => {
+    const file = resolve(fixtures, "invalid/persona-malformed-yaml.yaml");
+
+    const err = await loadOne(file).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.file).toBe(file);
+    expect(definitionError.message).toContain("persona-malformed-yaml.yaml");
+  });
+
+  it("wraps unreadable files in a DefinitionError", async () => {
+    const file = resolve(fixtures, "invalid/does-not-exist.yaml");
+
+    const err = await loadOne(file).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.file).toBe(file);
+    expect(definitionError.message).toContain("does-not-exist.yaml");
+  });
 });
