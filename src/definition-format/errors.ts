@@ -68,7 +68,11 @@ function nearestKey(
 
 /** Object / array schemas we can walk to find the keys valid at a path. */
 type WalkableSchema = {
-  readonly def: { readonly type?: string; readonly shape?: Record<string, WalkableSchema>; readonly element?: WalkableSchema };
+  readonly def: {
+    readonly type?: string;
+    readonly shape?: Record<string, WalkableSchema>;
+    readonly element?: WalkableSchema;
+  };
 };
 
 /** Keys accepted by the object schema at `path`, or empty if that node is not an object. */

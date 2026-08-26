@@ -150,6 +150,52 @@ systemPromptAppend: Be brief.
     expect(definitionError.message).toContain('did you mean "allow"');
   });
 
+  it("rejects multiple unknown keys with a plural message naming each", async () => {
+    const file = await writeTempYaml(`
+apiVersion: piflow/v1
+kind: persona
+name: critic
+description: Reviews diffs.
+skills: []
+tools:
+  allow: []
+  deny: []
+model: auto
+systemPromptAppend: Be brief.
+foo: 1
+bar: 2
+`);
+
+    const err = await loadOne(file).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.message).toContain("Unknown keys:");
+    expect(definitionError.message).toContain("foo");
+    expect(definitionError.message).toContain("bar");
+  });
+
+  it("points at an invalid skills element with an array-index path", async () => {
+    const file = await writeTempYaml(`
+apiVersion: piflow/v1
+kind: persona
+name: critic
+description: Reviews diffs.
+skills: [ok, 12]
+tools:
+  allow: []
+  deny: []
+model: auto
+systemPromptAppend: Be brief.
+`);
+
+    const err = await loadOne(file).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.path).toBe("skills[1]");
+  });
+
   it("rejects an unrelated unknown key without inventing a suggestion", async () => {
     const file = await writeTempYaml(`
 apiVersion: piflow/v1
