@@ -217,4 +217,63 @@ steps:
     expect(definitionError.path).toMatch(/steps\[0\]\.body\[1\]/);
     expect(definitionError.message).toContain("build");
   });
+
+  it("rejects a workflow file sitting in personas/", async () => {
+    const dir = await writeDefsDir();
+    await mkdir(join(dir, "personas"));
+    const file = join(dir, "personas", "not-a-persona.yaml");
+    await writeFile(
+      file,
+      `
+apiVersion: piflow/v1
+kind: workflow
+name: sneaky
+steps:
+  - id: review
+    type: node
+    persona: critic
+`,
+      "utf8",
+    );
+
+    const err = await loadDefinitions(dir).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.file).toBe(file);
+    expect(definitionError.path).toBe("kind");
+    expect(definitionError.message).toMatch(/persona/);
+    expect(definitionError.message).toMatch(/workflow/);
+  });
+
+  it("rejects a persona file sitting in workflows/", async () => {
+    const dir = await writeDefsDir();
+    await mkdir(join(dir, "workflows"));
+    const file = join(dir, "workflows", "not-a-workflow.yaml");
+    await writeFile(
+      file,
+      `
+apiVersion: piflow/v1
+kind: persona
+name: critic
+description: Reviews diffs.
+skills: []
+tools:
+  allow: []
+  deny: []
+model: auto
+systemPromptAppend: Be brief.
+`,
+      "utf8",
+    );
+
+    const err = await loadDefinitions(dir).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.file).toBe(file);
+    expect(definitionError.path).toBe("kind");
+    expect(definitionError.message).toMatch(/workflow/);
+    expect(definitionError.message).toMatch(/persona/);
+  });
 });
