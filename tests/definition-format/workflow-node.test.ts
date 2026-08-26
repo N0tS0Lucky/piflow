@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadOne } from "../../src/definition-format/index.js";
+import { DefinitionError, loadOne } from "../../src/definition-format/index.js";
 
 const tempDirs: string[] = [];
 
@@ -97,5 +97,24 @@ steps:
     expect(workflow.kind).toBe("workflow");
     if (workflow.kind !== "workflow") return;
     expect(workflow.steps[0]?.worktree).toBe(false);
+  });
+
+  it("rejects an interactive step missing persona with a path-aware error", async () => {
+    const file = await writeTempYaml(`
+apiVersion: piflow/v1
+kind: workflow
+name: interview-only
+steps:
+  - id: interview
+    type: interactive
+`);
+
+    const err = await loadOne(file).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.file).toBe(file);
+    expect(definitionError.path).toBe("steps[0].persona");
+    expect(definitionError.message).toContain("persona");
   });
 });
