@@ -47,6 +47,16 @@ async function writeWorkflow(dir: string, yaml: string): Promise<void> {
   await writeFile(join(dir, "workflows", "main.yaml"), yaml, "utf8");
 }
 
+/** Narrow a value or fail loudly — never return silently and skip the asserts below. */
+function expectType<T extends { type: string }>(
+  step: T,
+  type: T["type"],
+): void {
+  if (step.type !== type) {
+    throw new Error(`expected ${type} step, got "${step.type}"`);
+  }
+}
+
 /** Load definitions expecting exactly one DefinitionError; surfaces it on failure. */
 async function captureDefinitionError(dir: string): Promise<DefinitionError> {
   try {
@@ -81,13 +91,12 @@ steps:
 
     const graph = await loadDefinitions(dir);
     const steps = graph.workflows["build-feature"]?.steps;
-    expect(steps).toBeDefined();
-    if (!steps) return;
+    if (!steps) throw new Error("expected workflow steps to be present");
 
     const interview = steps[0];
-    if (interview.type !== "interactive") return;
+    expectType(interview, "interactive");
     const assessPlan = steps[1];
-    if (assessPlan.type !== "node") return;
+    expectType(assessPlan, "node");
 
     // The persona field is no longer a bare name string: it is the linked persona.
     const expected: Persona | undefined = graph.personas.critic;
@@ -126,19 +135,18 @@ steps:
 
     const graph = await loadDefinitions(dir);
     const steps = graph.workflows["review-loop"]?.steps;
-    expect(steps).toBeDefined();
-    if (!steps) return;
+    if (!steps) throw new Error("expected workflow steps to be present");
 
     const gateLoop = steps[0];
-    if (gateLoop.type !== "loop") return;
+    expectType(gateLoop, "loop");
     const build = gateLoop.body[0];
-    if (build.type !== "node") return;
+    expectType(build, "node");
     expect(build.persona).toBe(graph.personas.builder);
 
     const fanOut = steps[1];
-    if (fanOut.type !== "parallel") return;
+    expectType(fanOut, "parallel");
     const buildAgain = fanOut.body[0];
-    if (buildAgain.type !== "node") return;
+    expectType(buildAgain, "node");
     expect(buildAgain.persona).toBe(graph.personas.builder);
     expect(buildAgain.worktree).toBe(true);
   });
@@ -157,20 +165,14 @@ steps:
 `,
     );
 
-    let error: DefinitionError | undefined;
-    try {
-      await loadDefinitions(dir);
-    } catch (cause) {
-      error = cause as DefinitionError;
-    }
+    const error = await captureDefinitionError(dir);
 
-    expect(error).toBeInstanceOf(DefinitionError);
     // Authoring UX: the message names the workflow file, the step id, and the
     // persona name, so the author can go straight to the offending line.
-    expect(error?.file).toContain("main.yaml");
-    expect(error?.path).toBe("steps[0]");
-    expect(error?.message).toContain("assess-plan");
-    expect(error?.message).toContain("plan-assessor");
+    expect(error.file).toContain("main.yaml");
+    expect(error.path).toBe("steps[0]");
+    expect(error.message).toContain("assess-plan");
+    expect(error.message).toContain("plan-assessor");
   });
 
   it("rejects a persona reference colliding with an inherited Object property", async () => {
@@ -302,9 +304,9 @@ steps:
     expect(graph.personas.critic?.name).toBe("critic");
     expect(graph.personas.builder?.name).toBe("builder");
     const steps = graph.workflows["review-loop"]?.steps;
-    if (!steps) return;
+    if (!steps) throw new Error("expected workflow steps to be present");
     const gateLoop = steps[0];
-    if (gateLoop.type !== "loop") return;
+    expectType(gateLoop, "loop");
     // Loop structure survives resolution untouched...
     expect(gateLoop.maxIterations).toBe(6);
     expect(gateLoop.exitWhen).toEqual({
@@ -313,11 +315,11 @@ steps:
     });
     // ...while both body steps carry their linked personas.
     const build = gateLoop.body[0];
-    if (build.type !== "node") return;
+    expectType(build, "node");
     expect(build.persona).toBe(graph.personas.builder);
     expect(build.worktree).toBe(true);
     const review = gateLoop.body[1];
-    if (review.type !== "node") return;
+    expectType(review, "node");
     expect(review.persona).toBe(graph.personas.critic);
   });
 });
