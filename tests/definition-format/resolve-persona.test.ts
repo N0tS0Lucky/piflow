@@ -6,6 +6,10 @@ import {
   DefinitionError,
   loadDefinitions,
   type Persona,
+  type ResolvedLoopStep,
+  type ResolvedParallelStep,
+  type ResolvedSessionStep,
+  type ResolvedStep,
 } from "../../src/definition-format/index.js";
 
 const tempDirs: string[] = [];
@@ -48,10 +52,10 @@ async function writeWorkflow(dir: string, yaml: string): Promise<void> {
 }
 
 /** Narrow a value or fail loudly — never return silently and skip the asserts below. */
-function expectType<T extends { type: string }>(
-  step: T,
+function expectType<T extends ResolvedStep>(
+  step: ResolvedStep,
   type: T["type"],
-): void {
+): asserts step is T {
   if (step.type !== type) {
     throw new Error(`expected ${type} step, got "${step.type}"`);
   }
@@ -94,9 +98,9 @@ steps:
     if (!steps) throw new Error("expected workflow steps to be present");
 
     const interview = steps[0];
-    expectType(interview, "interactive");
+    expectType<ResolvedSessionStep>(interview, "interactive");
     const assessPlan = steps[1];
-    expectType(assessPlan, "node");
+    expectType<ResolvedSessionStep>(assessPlan, "node");
 
     // The persona field is no longer a bare name string: it is the linked persona.
     const expected: Persona | undefined = graph.personas.critic;
@@ -138,15 +142,15 @@ steps:
     if (!steps) throw new Error("expected workflow steps to be present");
 
     const gateLoop = steps[0];
-    expectType(gateLoop, "loop");
+    expectType<ResolvedLoopStep>(gateLoop, "loop");
     const build = gateLoop.body[0];
-    expectType(build, "node");
+    expectType<ResolvedSessionStep>(build, "node");
     expect(build.persona).toBe(graph.personas.builder);
 
     const fanOut = steps[1];
-    expectType(fanOut, "parallel");
+    expectType<ResolvedParallelStep>(fanOut, "parallel");
     const buildAgain = fanOut.body[0];
-    expectType(buildAgain, "node");
+    expectType<ResolvedSessionStep>(buildAgain, "node");
     expect(buildAgain.persona).toBe(graph.personas.builder);
     expect(buildAgain.worktree).toBe(true);
   });
@@ -306,7 +310,7 @@ steps:
     const steps = graph.workflows["review-loop"]?.steps;
     if (!steps) throw new Error("expected workflow steps to be present");
     const gateLoop = steps[0];
-    expectType(gateLoop, "loop");
+    expectType<ResolvedLoopStep>(gateLoop, "loop");
     // Loop structure survives resolution untouched...
     expect(gateLoop.maxIterations).toBe(6);
     expect(gateLoop.exitWhen).toEqual({
@@ -315,11 +319,11 @@ steps:
     });
     // ...while both body steps carry their linked personas.
     const build = gateLoop.body[0];
-    expectType(build, "node");
+    expectType<ResolvedSessionStep>(build, "node");
     expect(build.persona).toBe(graph.personas.builder);
     expect(build.worktree).toBe(true);
     const review = gateLoop.body[1];
-    expectType(review, "node");
+    expectType<ResolvedSessionStep>(review, "node");
     expect(review.persona).toBe(graph.personas.critic);
   });
 });
