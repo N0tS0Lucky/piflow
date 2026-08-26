@@ -148,10 +148,7 @@ src/definition-format/
   resolve.ts      # linked object graph builder (personas + invoked workflows attached)
   index.ts        # public API: loadDefinitions(dir), loadOne(file)
 tests/definition-format/
-  ...mirrors src/, plus fixtures below
-tests/fixtures/
-  valid/          # golden personas+workflows that must pass
-  invalid/        # one defect per fixture; test asserts error message content
+  ...mirrors src/ — tests generate their own YAML under the OS temp dir; no fixture tree
 ```
 
 ## Code Style
@@ -187,30 +184,31 @@ Conventions I'll hold myself to (you don't have to memorize them): exported func
 
 ## Testing Strategy
 
-This module is implemented under `test-driven-development`. The tests *are* the specification of the validation rules; the YAML fixtures *are* the examples in this spec, made executable.
+This module is implemented under `test-driven-development`. The tests *are* the specification of the validation rules. Each test constructs the document it loads: minimal YAML inline in the test itself, written to a fresh file under the OS temp dir at runtime and read back through the real parser. Input and expected output live together, so no shared example files can drift out from under the assertions.
 
 **Cycle (every behavior, no exceptions):**
 1. **RED** — write one test that describes the behavior and watch it fail for the right reason (missing function, or assertion fail — not a typo in the test).
 2. **GREEN** — write the minimum code that makes that test pass.
 3. **REFACTOR** — clean up with the suite green. No behavior changes during cleanup.
 
-**Prove-it for bugs:** a reported parse/validation bug starts as a failing fixture + assertion, then the fix, then the same test passing.
+**Prove-it for bugs:** a reported parse/validation bug starts as a failing test + assertion, then the fix, then the same test passing.
 
 **What to test (this module is almost entirely small/unit tests):**
 
 | Kind | Share | What |
 |---|---|---|
 | Small / unit | ~95% | Each validation rule, each step type, each error path. Pure functions, no network, no subprocesses. |
-| Medium / integration | ~5% | `loadDefinitions` over a real fixture directory on disk (real YAML files, real `yaml` parser — no mocks). |
+| Medium / integration | ~5% | `loadDefinitions` over a generated temporary directory of real files (real YAML written by the test, real `yaml` parser — no mocks). |
 | Large / e2e | 0% here | Belongs to runtime + cli later. |
 
 **Rules of the tests themselves:**
 
 - Test **state, not interactions** — assert on the resolved graph or the `DefinitionError` message, never on "zod.parse was called."
 - **DAMP over DRY** — each test tells a complete story. Duplicated 8-line YAML in two tests is better than a shared helper the reader has to chase.
-- **Real implementations over mocks.** The only I/O is reading fixture files; use real files. Do not mock `yaml` or zod.
+- **Real implementations over mocks.** The only I/O is real files: each test writes its own YAML to a unique temp path and reads it back. Do not mock `yaml`, zod, or the filesystem.
+- **Self-contained test data.** No shared fixture directories. Editing one case never breaks another; deleting a case deletes its data with it.
 - **Arrange–Act–Assert**, one concept per test, names that read as specifications (`it('rejects an invoke that names a missing workflow')`, not `it('works')`).
-- Message quality is tested: every invalid fixture asserts the error contains the expected file + path fragment. Authoring UX is a feature.
+- Message quality is tested: every invalid-case assertion checks the error contains the expected file + path fragment. Authoring UX is a feature.
 - **Purity / dependency-direction test:** this module imports nothing from `runtime`, `run-state`, or `live-view`. That's a test, not a hope.
 - Coverage target ≥90% lines. This is pure logic; gaps are untested rules.
 
@@ -224,13 +222,13 @@ This module is implemented under `test-driven-development`. The tests *are* the 
 
 ## Success Criteria
 
-1. `loadDefinitions("tests/fixtures/valid")` returns a resolved graph where every `node`/`interactive` step carries its linked persona, and every `invoke` step carries its linked (and itself resolved) workflow; zero dangling references.
+1. `loadDefinitions(<generated valid dir>)` returns a resolved graph where every `node`/`interactive` step carries its linked persona, and every `invoke` step carries its linked (and itself resolved) workflow; zero dangling references.
 2. A workflow referencing a missing persona fails with an error naming the workflow file, step id, and persona name.
 3. An `invoke` referencing a missing workflow fails the same way, naming the missing workflow.
 4. A cycle `A invoke B invoke A` fails with an error listing the cycle path.
 5. A typo'd key at any depth fails with that key's full path in the message.
 6. A loop missing `maxIterations` or with an empty body, and a parallel with an empty body, fail with a path pointing at the offending step.
-7. All valid fixtures — including at least one that `invoke`s another workflow and one that uses `parallel` of `invoke`s — round-trip through load→serialize→load.
+7. All valid documents generated by the suite — including at least one that `invoke`s another workflow and one that uses `parallel` of `invoke`s — round-trip through load→serialize→load.
 8. Dependency-direction test passes (no imports from sibling modules).
 9. `npm test && npm run lint && npm run build` all green.
 10. Every success criterion above is witnessed by a test that was RED before the code that satisfies it existed.
