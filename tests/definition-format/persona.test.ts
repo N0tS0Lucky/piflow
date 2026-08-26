@@ -36,4 +36,27 @@ describe("loadOne (persona)", () => {
     expect(definitionError.path).toBe("description");
     expect(definitionError.message).toContain("description");
   });
+
+  it("rejects an unknown top-level key, hinting the known key it resembles", async () => {
+    const file = resolve(fixtures, "invalid/persona-unknown-key-typo.yaml");
+
+    const err = await loadOne(file).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.path).toBe(""); // top level
+    expect(definitionError.message).toContain("descripton");
+    expect(definitionError.message).toContain('did you mean "description"');
+  });
+
+  it("rejects an unrelated unknown key without inventing a suggestion", async () => {
+    const file = resolve(fixtures, "invalid/persona-unknown-key-unrelated.yaml");
+
+    const err = await loadOne(file).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.message).toContain("zzzqqqxxx");
+    expect(definitionError.message).not.toContain("did you mean");
+  });
 });
