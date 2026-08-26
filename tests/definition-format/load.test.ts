@@ -153,4 +153,68 @@ steps:
     expect(definitionError.message).toContain("review.yaml");
     expect(definitionError.message).toContain("loop.yaml");
   });
+
+  it("rejects duplicate step ids in the same top-level list with a path", async () => {
+    const dir = await writeDefsDir();
+    await mkdir(join(dir, "workflows"));
+    const file = join(dir, "workflows", "dup.yaml");
+    await writeFile(
+      file,
+      `
+apiVersion: piflow/v1
+kind: workflow
+name: dup-ids
+steps:
+  - id: review
+    type: node
+    persona: critic
+  - id: review
+    type: node
+    persona: builder
+`,
+      "utf8",
+    );
+
+    const err = await loadDefinitions(dir).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.file).toBe(file);
+    expect(definitionError.path).toMatch(/steps\[1\]/);
+    expect(definitionError.message).toContain("review");
+  });
+
+  it("rejects duplicate step ids inside a loop body with a path", async () => {
+    const dir = await writeDefsDir();
+    await mkdir(join(dir, "workflows"));
+    const file = join(dir, "workflows", "dup-body.yaml");
+    await writeFile(
+      file,
+      `
+apiVersion: piflow/v1
+kind: workflow
+name: dup-body
+steps:
+  - id: build-review-loop
+    type: loop
+    maxIterations: 3
+    body:
+      - id: build
+        type: node
+        persona: builder
+      - id: build
+        type: node
+        persona: critic
+`,
+      "utf8",
+    );
+
+    const err = await loadDefinitions(dir).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.file).toBe(file);
+    expect(definitionError.path).toMatch(/steps\[0\]\.body\[1\]/);
+    expect(definitionError.message).toContain("build");
+  });
 });

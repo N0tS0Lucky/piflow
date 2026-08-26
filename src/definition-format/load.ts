@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { DefinitionError, mapZodError } from "./errors.js";
+import { assertUniqueStepIds } from "./validate.js";
 import {
   type Persona,
   PersonaSchema,
@@ -63,6 +64,7 @@ export async function loadDefinitions(
       );
     }
     workflowFiles.set(loaded.name, file);
+    assertUniqueStepIds(file, loaded);
     workflows[loaded.name] = loaded;
   }
 
