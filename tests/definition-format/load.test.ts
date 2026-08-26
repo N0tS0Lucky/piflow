@@ -2,7 +2,10 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadDefinitions } from "../../src/definition-format/index.js";
+import {
+  DefinitionError,
+  loadDefinitions,
+} from "../../src/definition-format/index.js";
 
 const tempDirs: string[] = [];
 
@@ -94,5 +97,34 @@ steps:
     expect(Object.keys(graph.workflows)).toEqual(["review-loop"]);
     expect(graph.workflows["review-loop"]?.kind).toBe("workflow");
     expect(graph.workflows["review-loop"]?.steps).toHaveLength(1);
+  });
+
+  it("rejects two personas that share a name, naming both files", async () => {
+    const dir = await writeDefsDir();
+    await mkdir(join(dir, "personas"));
+    const first = join(dir, "personas", "critic.yaml");
+    const second = join(dir, "personas", "reviewer.yaml");
+    const yaml = `
+apiVersion: piflow/v1
+kind: persona
+name: critic
+description: Reviews diffs.
+skills: []
+tools:
+  allow: []
+  deny: []
+model: auto
+systemPromptAppend: Be brief.
+`;
+    await writeFile(first, yaml, "utf8");
+    await writeFile(second, yaml, "utf8");
+
+    const err = await loadDefinitions(dir).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.message).toContain("critic");
+    expect(definitionError.message).toContain("critic.yaml");
+    expect(definitionError.message).toContain("reviewer.yaml");
   });
 });
