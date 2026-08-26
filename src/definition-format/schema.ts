@@ -23,7 +23,7 @@ export const PersonaFields = z.strictObject({
  * Exactly one of systemPromptReplace / systemPromptAppend — never both,
  * never neither. Whole-file rule, so the error points at the file root.
  */
-function requireExactlyOnePrompt(payload: z.core.$ZodParsePayload<Persona>) {
+function requireExactlyOnePrompt(payload: z.core.ParsePayload<Persona>) {
   const persona = payload.value;
   const hasReplace = persona.systemPromptReplace !== undefined;
   const hasAppend = persona.systemPromptAppend !== undefined;

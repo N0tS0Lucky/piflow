@@ -50,7 +50,10 @@ describe("loadOne (persona)", () => {
   });
 
   it("rejects an unrelated unknown key without inventing a suggestion", async () => {
-    const file = resolve(fixtures, "invalid/persona-unknown-key-unrelated.yaml");
+    const file = resolve(
+      fixtures,
+      "invalid/persona-unknown-key-unrelated.yaml",
+    );
 
     const err = await loadOne(file).catch((e: unknown) => e);
 

@@ -3,3 +3,4 @@ dist
 coverage
 *.md
 package-lock.json
+tests/fixtures/
