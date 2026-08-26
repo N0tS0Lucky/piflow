@@ -7,12 +7,27 @@ import {
   DefinitionError,
   loadDefinitions,
   type ResolvedDefinitions,
+  type ResolvedInvokeStep,
+  type ResolvedLoopStep,
+  type ResolvedParallelStep,
+  type ResolvedSessionStep,
+  type ResolvedStep,
 } from "../../src/definition-format/index.js";
 
 /** Repo-rooted fixture dir for a scenario under tests/fixtures/invalid/. */
 function invalidFixture(name: string): string {
   const here = dirname(fileURLToPath(import.meta.url)); // tests/definition-format
   return join(here, "..", "fixtures", "invalid", name);
+}
+
+/** Narrow a value or fail loudly — never return silently and skip the asserts below. */
+function expectType<T extends ResolvedStep>(
+  step: ResolvedStep,
+  type: T["type"],
+): asserts step is T {
+  if (step.type !== type) {
+    throw new Error(`expected ${type} step, got "${step.type}"`);
+  }
 }
 
 const tempDirs: string[] = [];
@@ -251,5 +266,56 @@ describe("invoke cycle rejection", () => {
     );
 
     expect(error.message).toContain("alpha → beta → gamma → alpha");
+  });
+});
+
+describe("valid invoke resolution", () => {
+  /** Fixture dir: spec's build-feature example, personas + workflows. */
+  function validFixture(): string {
+    const here = dirname(fileURLToPath(import.meta.url)); // tests/definition-format
+    return join(here, "..", "fixtures", "valid", "build-feature");
+  }
+
+  it("resolves the spec's build-feature example fully, invokes included", async () => {
+    const graph = await loadDefinitions(validFixture());
+
+    const steps = graph.workflows["build-feature"]?.steps;
+    if (!steps) throw new Error("expected workflow steps to be present");
+
+    // Session steps still link their personas...
+    const interview = steps[0];
+    expectType<ResolvedSessionStep>(interview, "interactive");
+    expect(interview.persona).toBe(graph.personas.interviewer);
+    const assessPlan = steps[1];
+    expectType<ResolvedSessionStep>(assessPlan, "node");
+    expect(assessPlan.persona).toBe(graph.personas["plan-assessor"]);
+
+    // ...and an invoke step carries the linked workflow, itself resolved.
+    const implement = steps[2];
+    expectType<ResolvedInvokeStep>(implement, "invoke");
+    const reviewLoop = implement.workflow;
+    if (!reviewLoop) throw new Error("expected review-loop to be linked");
+    expect(reviewLoop.name).toBe("review-loop");
+    expect(reviewLoop.steps[0]).toBeDefined();
+    const gateLoop = reviewLoop.steps[0];
+    expectType<ResolvedLoopStep>(gateLoop, "loop");
+    const build = gateLoop.body[0];
+    expectType<ResolvedSessionStep>(build, "node");
+    expect(build.persona).toBe(graph.personas.builder);
+    expect(build.worktree).toBe(true);
+    const review = gateLoop.body[1];
+    expectType<ResolvedSessionStep>(review, "node");
+    expect(review.persona).toBe(graph.personas.critic);
+
+    // A parallel of two invokes resolves both targets.
+    const shipAndDocs = steps[3];
+    expectType<ResolvedParallelStep>(shipAndDocs, "parallel");
+    const ship = shipAndDocs.body[0];
+    expectType<ResolvedInvokeStep>(ship, "invoke");
+    expect(ship.workflow.name).toBe("open-pr");
+    expect(ship.workflow.steps[0]?.type).toBe("node");
+    const docs = shipAndDocs.body[1];
+    expectType<ResolvedInvokeStep>(docs, "invoke");
+    expect(docs.workflow.name).toBe("write-docs");
   });
 });

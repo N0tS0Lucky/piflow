@@ -1,0 +1,24 @@
+# SPEC-definition-format.md, Format Design — the build-feature example.
+apiVersion: piflow/v1
+kind: workflow
+name: build-feature
+
+steps:
+  - id: interview
+    type: interactive
+    persona: interviewer
+  - id: assess-plan
+    type: node
+    persona: plan-assessor
+  - id: implement
+    type: invoke
+    workflow: review-loop
+  - id: ship-and-docs
+    type: parallel
+    body:
+      - id: ship
+        type: invoke
+        workflow: open-pr
+      - id: docs
+        type: invoke
+        workflow: write-docs

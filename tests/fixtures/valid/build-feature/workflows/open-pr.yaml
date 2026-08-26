@@ -1,0 +1,7 @@
+apiVersion: piflow/v1
+kind: workflow
+name: open-pr
+steps:
+  - id: push-branch
+    type: node
+    persona: shipper
