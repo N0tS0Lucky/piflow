@@ -9,19 +9,21 @@ import {
   type Workflow,
   WorkflowSchema,
 } from "./schema.js";
+import {
+  resolveDefinitions,
+  type RawDefinitions,
+  type ResolvedDefinitions,
+} from "./resolve.js";
 
-/** Directory load result. Reference linking is a later task. */
-export type LoadedDefinitions = {
-  personas: Record<string, Persona>;
-  workflows: Record<string, Workflow>;
-};
-
-/** Load `personas/*.yaml` and `workflows/*.yaml` from a definitions directory. */
-export async function loadDefinitions(dir: string): Promise<LoadedDefinitions> {
-  return {
+/** Load `personas/*.yaml` + `workflows/*.yaml`, then resolve references. */
+export async function loadDefinitions(
+  dir: string,
+): Promise<ResolvedDefinitions> {
+  const raw: RawDefinitions = {
     personas: await loadLibrary(join(dir, "personas"), "persona"),
     workflows: await loadLibrary(join(dir, "workflows"), "workflow"),
   };
+  return resolveDefinitions(raw);
 }
 
 type Kind = Persona["kind"] | Workflow["kind"];
