@@ -159,4 +159,57 @@ steps:
     expect(error?.message).toContain("assess-plan");
     expect(error?.message).toContain("plan-assessor");
   });
+
+  it("resolves the spec's review-loop example against critic/builder personas", async () => {
+    const dir = await writeDefsDir();
+    await writePersona(dir, "critic");
+    await writePersona(dir, "builder");
+    await writeFile(
+      join(dir, "workflows", "review-loop.yaml"),
+      `
+apiVersion: piflow/v1
+kind: workflow
+name: review-loop
+steps:
+  - id: build-review-loop
+    type: loop
+    maxIterations: 6
+    exitWhen:
+      batonField: approved
+      equals: true
+    body:
+      - id: build
+        type: node
+        persona: builder
+        worktree: true
+      - id: review
+        type: node
+        persona: critic
+`,
+      "utf8",
+    );
+
+    const graph = await loadDefinitions(dir);
+
+    expect(graph.personas.critic?.name).toBe("critic");
+    expect(graph.personas.builder?.name).toBe("builder");
+    const steps = graph.workflows["review-loop"]?.steps;
+    if (!steps) return;
+    const gateLoop = steps[0];
+    if (gateLoop.type !== "loop") return;
+    // Loop structure survives resolution untouched...
+    expect(gateLoop.maxIterations).toBe(6);
+    expect(gateLoop.exitWhen).toEqual({
+      batonField: "approved",
+      equals: true,
+    });
+    // ...while both body steps carry their linked personas.
+    const build = gateLoop.body[0];
+    if (build.type !== "node") return;
+    expect(build.persona).toBe(graph.personas.builder);
+    expect(build.worktree).toBe(true);
+    const review = gateLoop.body[1];
+    if (review.type !== "node") return;
+    expect(review.persona).toBe(graph.personas.critic);
+  });
 });
