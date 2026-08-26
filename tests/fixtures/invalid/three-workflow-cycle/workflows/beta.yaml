@@ -1,0 +1,8 @@
+# Three-workflow cycle: middle link.
+apiVersion: piflow/v1
+kind: workflow
+name: beta
+steps:
+  - id: go-gamma
+    type: invoke
+    workflow: gamma

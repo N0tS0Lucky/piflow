@@ -1,12 +1,19 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   DefinitionError,
   loadDefinitions,
   type ResolvedDefinitions,
 } from "../../src/definition-format/index.js";
+
+/** Repo-rooted fixture dir for a scenario under tests/fixtures/invalid/. */
+function invalidFixture(name: string): string {
+  const here = dirname(fileURLToPath(import.meta.url)); // tests/definition-format
+  return join(here, "..", "fixtures", "invalid", name);
+}
 
 const tempDirs: string[] = [];
 
@@ -213,5 +220,36 @@ steps:
 
     expect(error.path).toBe("steps[0]");
     expect(error.message).toContain('did you mean "review-loop"');
+  });
+});
+
+describe("invoke cycle rejection", () => {
+  it("rejects a workflow that invokes itself, listing the cycle path", async () => {
+    const error = await captureDefinitionError(invalidFixture("self-invoke"));
+
+    expect(error.file).toContain("build-feature.yaml");
+    expect(error.path).toBe("steps[0]");
+    expect(error.message).toContain("build-feature → build-feature");
+  });
+
+  it("rejects a two-workflow cycle with the full path in the message", async () => {
+    // Which file reports the error depends on which side resolution reaches
+    // first; the path itself is normalized to start at "helper" either way.
+    const error = await captureDefinitionError(
+      invalidFixture("two-workflow-cycle"),
+    );
+
+    expect(error.message).toContain("helper → main → helper");
+    expect(
+      error.file.endsWith("main.yaml") || error.file.endsWith("helper.yaml"),
+    ).toBe(true);
+  });
+
+  it("rejects a three-workflow cycle with the full path in the message", async () => {
+    const error = await captureDefinitionError(
+      invalidFixture("three-workflow-cycle"),
+    );
+
+    expect(error.message).toContain("alpha → beta → gamma → alpha");
   });
 });

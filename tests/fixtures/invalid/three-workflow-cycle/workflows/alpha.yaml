@@ -1,0 +1,8 @@
+# Three-workflow cycle: alpha -> beta -> gamma -> alpha.
+apiVersion: piflow/v1
+kind: workflow
+name: alpha
+steps:
+  - id: go-beta
+    type: invoke
+    workflow: beta
