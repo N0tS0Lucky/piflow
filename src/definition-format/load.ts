@@ -20,55 +20,51 @@ export type LoadedDefinitions = {
 export async function loadDefinitions(
   dir: string,
 ): Promise<LoadedDefinitions> {
-  const personas: Record<string, Persona> = {};
-  const workflows: Record<string, Workflow> = {};
-  const personaFiles = new Map<string, string>();
-  const workflowFiles = new Map<string, string>();
+  return {
+    personas: await loadLibrary(join(dir, "personas"), "persona"),
+    workflows: await loadLibrary(join(dir, "workflows"), "workflow"),
+  };
+}
 
-  for (const file of await listYaml(join(dir, "personas"))) {
+type Kind = Persona["kind"] | Workflow["kind"];
+type DefinitionOf<K extends Kind> = Extract<Persona | Workflow, { kind: K }>;
+
+function isKind<K extends Kind>(
+  loaded: Persona | Workflow,
+  kind: K,
+): loaded is DefinitionOf<K> {
+  return loaded.kind === kind;
+}
+
+async function loadLibrary<K extends Kind>(
+  dir: string,
+  expectedKind: K,
+): Promise<Record<string, DefinitionOf<K>>> {
+  const collected: Record<string, DefinitionOf<K>> = {};
+  const filesByName = new Map<string, string>();
+
+  for (const file of await listYaml(dir)) {
     const loaded = await loadOne(file);
-    if (loaded.kind !== "persona") {
+    if (!isKind(loaded, expectedKind)) {
       throw new DefinitionError(
         file,
         "kind",
-        `Expected kind "persona" in personas/, found "${loaded.kind}".`,
+        `Expected kind "${expectedKind}" in ${expectedKind}s/, found "${loaded.kind}".`,
       );
     }
-    const previous = personaFiles.get(loaded.name);
+    const previous = filesByName.get(loaded.name);
     if (previous !== undefined) {
       throw new DefinitionError(
         file,
         "name",
-        `Duplicate persona name "${loaded.name}" (also defined in ${previous}).`,
+        `Duplicate ${expectedKind} name "${loaded.name}" (also defined in ${previous}).`,
       );
     }
-    personaFiles.set(loaded.name, file);
-    personas[loaded.name] = loaded;
+    filesByName.set(loaded.name, file);
+    collected[loaded.name] = loaded;
   }
 
-  for (const file of await listYaml(join(dir, "workflows"))) {
-    const loaded = await loadOne(file);
-    if (loaded.kind !== "workflow") {
-      throw new DefinitionError(
-        file,
-        "kind",
-        `Expected kind "workflow" in workflows/, found "${loaded.kind}".`,
-      );
-    }
-    const previous = workflowFiles.get(loaded.name);
-    if (previous !== undefined) {
-      throw new DefinitionError(
-        file,
-        "name",
-        `Duplicate workflow name "${loaded.name}" (also defined in ${previous}).`,
-      );
-    }
-    workflowFiles.set(loaded.name, file);
-    assertUniqueStepIds(file, loaded);
-    workflows[loaded.name] = loaded;
-  }
-
-  return { personas, workflows };
+  return collected;
 }
 
 /** Direct `*.yaml` children of `dir`; missing directory → no files. */
@@ -115,6 +111,7 @@ export async function loadOne(filePath: string): Promise<Persona | Workflow> {
     if (!result.success) {
       throw mapZodError(filePath, result.error, WorkflowSchema);
     }
+    assertUniqueStepIds(filePath, result.data);
     return result.data;
   }
 
