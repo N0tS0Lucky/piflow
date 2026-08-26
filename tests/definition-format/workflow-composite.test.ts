@@ -177,7 +177,9 @@ steps:
     const definitionError = err as DefinitionError;
     expect(definitionError.file).toBe(file);
     expect(definitionError.path).toBe("steps[0].maxIterations");
-    expect(definitionError.message).toMatch(/maxIterations|required|undefined/i);
+    expect(definitionError.message).toMatch(
+      /maxIterations|required|undefined/i,
+    );
   });
 
   it("rejects a loop with maxIterations less than 1", async () => {

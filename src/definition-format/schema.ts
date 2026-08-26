@@ -66,23 +66,23 @@ export const ExitWhenSchema = z.strictObject({
   equals: z.unknown(),
 });
 
-/**
- * `loop` step. `body` is a non-empty nested step list; `maxIterations` >= 1.
- * Recursive via `z.lazy` so bodies may contain further loops/parallels.
- */
+/** Non-empty nested step list. Lazy so loop/parallel bodies may nest. */
+const NestedSteps = z.array(z.lazy(() => StepSchema)).min(1);
+
+/** `loop` step. `maxIterations` >= 1; optional `exitWhen` over the latest baton. */
 export const LoopStepSchema = z.strictObject({
   id: z.string(),
   type: z.literal("loop"),
   maxIterations: z.number().int().min(1),
   exitWhen: ExitWhenSchema.optional(),
-  body: z.array(z.lazy(() => StepSchema)).min(1),
+  body: NestedSteps,
 });
 
-/** `parallel` step. `body` is a non-empty nested step list. */
+/** `parallel` step. Same body rules as loop. */
 export const ParallelStepSchema = z.strictObject({
   id: z.string(),
   type: z.literal("parallel"),
-  body: z.array(z.lazy(() => StepSchema)).min(1),
+  body: NestedSteps,
 });
 
 const StepUnionSchema = z.discriminatedUnion("type", [
