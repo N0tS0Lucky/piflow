@@ -117,4 +117,26 @@ steps:
     expect(definitionError.path).toBe("steps[0].persona");
     expect(definitionError.message).toContain("persona");
   });
+
+  it("rejects an unknown key on a step with a path and a did-you-mean hint", async () => {
+    const file = await writeTempYaml(`
+apiVersion: piflow/v1
+kind: workflow
+name: assess
+steps:
+  - id: assess-plan
+    type: node
+    persona: plan-assessor
+    worktre: true
+`);
+
+    const err = await loadOne(file).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.file).toBe(file);
+    expect(definitionError.path).toBe("steps[0]");
+    expect(definitionError.message).toContain("worktre");
+    expect(definitionError.message).toContain('did you mean "worktree"');
+  });
 });
