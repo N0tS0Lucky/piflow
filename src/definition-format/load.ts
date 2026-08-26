@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { DefinitionError, mapZodError } from "./errors.js";
 import {
@@ -16,9 +17,59 @@ export type LoadedDefinitions = {
 
 /** Load `personas/*.yaml` and `workflows/*.yaml` from a definitions directory. */
 export async function loadDefinitions(
-  _dir: string,
+  dir: string,
 ): Promise<LoadedDefinitions> {
-  return { personas: {}, workflows: {} };
+  const personas: Record<string, Persona> = {};
+  const workflows: Record<string, Workflow> = {};
+
+  for (const file of await listYaml(join(dir, "personas"))) {
+    const loaded = await loadOne(file);
+    if (loaded.kind !== "persona") {
+      throw new DefinitionError(
+        file,
+        "kind",
+        `Expected kind "persona" in personas/, found "${loaded.kind}".`,
+      );
+    }
+    personas[loaded.name] = loaded;
+  }
+
+  for (const file of await listYaml(join(dir, "workflows"))) {
+    const loaded = await loadOne(file);
+    if (loaded.kind !== "workflow") {
+      throw new DefinitionError(
+        file,
+        "kind",
+        `Expected kind "workflow" in workflows/, found "${loaded.kind}".`,
+      );
+    }
+    workflows[loaded.name] = loaded;
+  }
+
+  return { personas, workflows };
+}
+
+/** Direct `*.yaml` children of `dir`; missing directory → no files. */
+async function listYaml(dir: string): Promise<string[]> {
+  let names: string[];
+  try {
+    names = await readdir(dir);
+  } catch (cause) {
+    if (isMissingDir(cause)) return [];
+    throw asDefinitionError(dir, "Cannot read directory", cause);
+  }
+  return names
+    .filter((name) => name.endsWith(".yaml"))
+    .map((name) => join(dir, name));
+}
+
+function isMissingDir(cause: unknown): boolean {
+  return (
+    typeof cause === "object" &&
+    cause !== null &&
+    "code" in cause &&
+    cause.code === "ENOENT"
+  );
 }
 
 /** Load and validate a single persona or workflow definition file. */
