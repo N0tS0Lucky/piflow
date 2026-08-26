@@ -1,12 +1,92 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { DefinitionError, mapZodError } from "./errors.js";
+import { assertUniqueStepIds } from "./validate.js";
 import {
   type Persona,
   PersonaSchema,
   type Workflow,
   WorkflowSchema,
 } from "./schema.js";
+
+/** Directory load result. Reference linking is a later task. */
+export type LoadedDefinitions = {
+  personas: Record<string, Persona>;
+  workflows: Record<string, Workflow>;
+};
+
+/** Load `personas/*.yaml` and `workflows/*.yaml` from a definitions directory. */
+export async function loadDefinitions(dir: string): Promise<LoadedDefinitions> {
+  return {
+    personas: await loadLibrary(join(dir, "personas"), "persona"),
+    workflows: await loadLibrary(join(dir, "workflows"), "workflow"),
+  };
+}
+
+type Kind = Persona["kind"] | Workflow["kind"];
+type DefinitionOf<K extends Kind> = Extract<Persona | Workflow, { kind: K }>;
+
+function isKind<K extends Kind>(
+  loaded: Persona | Workflow,
+  kind: K,
+): loaded is DefinitionOf<K> {
+  return loaded.kind === kind;
+}
+
+async function loadLibrary<K extends Kind>(
+  dir: string,
+  expectedKind: K,
+): Promise<Record<string, DefinitionOf<K>>> {
+  const collected: Record<string, DefinitionOf<K>> = {};
+  const filesByName = new Map<string, string>();
+
+  for (const file of await listYaml(dir)) {
+    const loaded = await loadOne(file);
+    if (!isKind(loaded, expectedKind)) {
+      throw new DefinitionError(
+        file,
+        "kind",
+        `Expected kind "${expectedKind}" in ${expectedKind}s/, found "${loaded.kind}".`,
+      );
+    }
+    const previous = filesByName.get(loaded.name);
+    if (previous !== undefined) {
+      throw new DefinitionError(
+        file,
+        "name",
+        `Duplicate ${expectedKind} name "${loaded.name}" (also defined in ${previous}).`,
+      );
+    }
+    filesByName.set(loaded.name, file);
+    collected[loaded.name] = loaded;
+  }
+
+  return collected;
+}
+
+/** Direct `*.yaml` children of `dir`; missing directory → no files. */
+async function listYaml(dir: string): Promise<string[]> {
+  let names: string[];
+  try {
+    names = await readdir(dir);
+  } catch (cause) {
+    if (isMissingDir(cause)) return [];
+    throw asDefinitionError(dir, "Cannot read directory", cause);
+  }
+  return names
+    .filter((name) => name.endsWith(".yaml"))
+    .map((name) => join(dir, name));
+}
+
+function isMissingDir(cause: unknown): boolean {
+  return (
+    typeof cause === "object" &&
+    cause !== null &&
+    "code" in cause &&
+    cause.code === "ENOENT"
+  );
+}
 
 /** Load and validate a single persona or workflow definition file. */
 export async function loadOne(filePath: string): Promise<Persona | Workflow> {
@@ -29,6 +109,7 @@ export async function loadOne(filePath: string): Promise<Persona | Workflow> {
     if (!result.success) {
       throw mapZodError(filePath, result.error, WorkflowSchema);
     }
+    assertUniqueStepIds(filePath, result.data);
     return result.data;
   }
 
