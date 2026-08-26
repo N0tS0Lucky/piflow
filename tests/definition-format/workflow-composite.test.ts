@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadOne } from "../../src/definition-format/index.js";
+import { DefinitionError, loadOne } from "../../src/definition-format/index.js";
 
 const tempDirs: string[] = [];
 
@@ -114,5 +114,46 @@ steps:
         ],
       },
     ]);
+  });
+
+  it("rejects an empty loop body with a path pointing at the step", async () => {
+    const file = await writeTempYaml(`
+apiVersion: piflow/v1
+kind: workflow
+name: empty-loop
+steps:
+  - id: build-review-loop
+    type: loop
+    maxIterations: 6
+    body: []
+`);
+
+    const err = await loadOne(file).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.file).toBe(file);
+    expect(definitionError.path).toBe("steps[0].body");
+    expect(definitionError.message).toMatch(/body|1/i);
+  });
+
+  it("rejects an empty parallel body with a path pointing at the step", async () => {
+    const file = await writeTempYaml(`
+apiVersion: piflow/v1
+kind: workflow
+name: empty-parallel
+steps:
+  - id: ship-and-docs
+    type: parallel
+    body: []
+`);
+
+    const err = await loadOne(file).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.file).toBe(file);
+    expect(definitionError.path).toBe("steps[0].body");
+    expect(definitionError.message).toMatch(/body|1/i);
   });
 });
