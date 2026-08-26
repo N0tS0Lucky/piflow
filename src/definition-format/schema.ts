@@ -66,31 +66,6 @@ export const ExitWhenSchema = z.strictObject({
   equals: z.unknown(),
 });
 
-/** Non-empty nested step list. Lazy so loop/parallel bodies may nest. */
-const NestedSteps = z.array(z.lazy(() => StepSchema)).min(1);
-
-/** `loop` step. `maxIterations` >= 1; optional `exitWhen` over the latest baton. */
-export const LoopStepSchema = z.strictObject({
-  id: z.string(),
-  type: z.literal("loop"),
-  maxIterations: z.number().int().min(1),
-  exitWhen: ExitWhenSchema.optional(),
-  body: NestedSteps,
-});
-
-/** `parallel` step. Same body rules as loop. */
-export const ParallelStepSchema = z.strictObject({
-  id: z.string(),
-  type: z.literal("parallel"),
-  body: NestedSteps,
-});
-
-const StepUnionSchema = z.discriminatedUnion("type", [
-  SessionStepSchema,
-  LoopStepSchema,
-  ParallelStepSchema,
-]);
-
 function withDefaultNodeType(value: unknown): unknown {
   if (
     typeof value === "object" &&
@@ -103,11 +78,46 @@ function withDefaultNodeType(value: unknown): unknown {
   return value;
 }
 
+/** Recursive step union. Session fields stay inferred; composites close the loop. */
+export type Step =
+  | z.infer<typeof SessionStepSchema>
+  | {
+      id: string;
+      type: "loop";
+      maxIterations: number;
+      exitWhen?: z.infer<typeof ExitWhenSchema>;
+      body: Step[];
+    }
+  | {
+      id: string;
+      type: "parallel";
+      body: Step[];
+    };
+
 /**
- * Discriminated unions require `type`. Omitted `type` still means `node`,
- * so we fill it in before the discriminator runs.
+ * Closed step union for v1 minus `invoke` (later task).
+ * Discriminated unions require `type`; omitted `type` still means `node`.
+ * The recursive annotation is required: TypeScript cannot infer a type that
+ * contains itself through `z.lazy` / getters without an explicit bound.
  */
-export const StepSchema = z.preprocess(withDefaultNodeType, StepUnionSchema);
+export const StepSchema: z.ZodType<Step> = z.preprocess(
+  withDefaultNodeType,
+  z.discriminatedUnion("type", [
+    SessionStepSchema,
+    z.strictObject({
+      id: z.string(),
+      type: z.literal("loop"),
+      maxIterations: z.number().int().min(1),
+      exitWhen: ExitWhenSchema.optional(),
+      body: z.array(z.lazy(() => StepSchema)).min(1),
+    }),
+    z.strictObject({
+      id: z.string(),
+      type: z.literal("parallel"),
+      body: z.array(z.lazy(() => StepSchema)).min(1),
+    }),
+  ]),
+);
 
 export const WorkflowSchema = z.strictObject({
   apiVersion: z.literal("piflow/v1"),
