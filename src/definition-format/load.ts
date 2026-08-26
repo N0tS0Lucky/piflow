@@ -8,6 +8,19 @@ import {
   WorkflowSchema,
 } from "./schema.js";
 
+/** Directory load result. Reference linking is a later task. */
+export type LoadedDefinitions = {
+  personas: Record<string, Persona>;
+  workflows: Record<string, Workflow>;
+};
+
+/** Load `personas/*.yaml` and `workflows/*.yaml` from a definitions directory. */
+export async function loadDefinitions(
+  _dir: string,
+): Promise<LoadedDefinitions> {
+  return { personas: {}, workflows: {} };
+}
+
 /** Load and validate a single persona or workflow definition file. */
 export async function loadOne(filePath: string): Promise<Persona | Workflow> {
   let contents: string;
