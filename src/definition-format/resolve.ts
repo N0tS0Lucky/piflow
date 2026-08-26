@@ -43,7 +43,10 @@ export type ResolvedParallelStep = {
 };
 
 export type ResolvedStep =
-  ResolvedSessionStep | ResolvedInvokeStep | ResolvedLoopStep | ResolvedParallelStep;
+  | ResolvedSessionStep
+  | ResolvedInvokeStep
+  | ResolvedLoopStep
+  | ResolvedParallelStep;
 
 export type ResolvedWorkflow = Omit<Workflow, "steps"> & {
   steps: ResolvedStep[];
@@ -68,12 +71,15 @@ export function resolveDefinitions(raw: RawDefinitions): ResolvedDefinitions {
     Object.create(null),
     Object.fromEntries(personas),
   );
+  const workflowFiles = new Map<string, string>(
+    Object.entries(raw.workflows).map(([name, entry]) => [name, entry.file]),
+  );
   return {
     personas: personasRecord,
     workflows: Object.fromEntries(
       Object.entries(raw.workflows).map(([name, entry]) => [
         name,
-        resolveWorkflow(entry.file, entry.definition, personas),
+        resolveWorkflow(entry.file, entry.definition, personas, workflowFiles),
       ]),
     ),
   };
@@ -83,10 +89,11 @@ function resolveWorkflow(
   file: string,
   workflow: Workflow,
   personas: Map<string, Persona>,
+  workflowNames: Map<string, string>,
 ): ResolvedWorkflow {
   return {
     ...workflow,
-    steps: resolveSteps(file, "steps", workflow.steps, personas),
+    steps: resolveSteps(file, "steps", workflow.steps, personas, workflowNames),
   };
 }
 
@@ -95,6 +102,7 @@ function resolveSteps(
   path: string,
   steps: Step[],
   personas: Map<string, Persona>,
+  workflowNames: Map<string, string>,
 ): ResolvedStep[] {
   return steps.map((step, index) => {
     const stepPath = `${path}[${index}]`;
@@ -117,10 +125,26 @@ function resolveSteps(
       case "parallel":
         return {
           ...step,
-          body: resolveSteps(file, `${stepPath}.body`, step.body, personas),
+          body: resolveSteps(
+            file,
+            `${stepPath}.body`,
+            step.body,
+            personas,
+            workflowNames,
+          ),
         };
-      case "invoke":
+      case "invoke": {
+        if (!workflowNames.has(step.workflow)) {
+          const nearest = nearestKey(step.workflow, [...workflowNames.keys()]);
+          throw new DefinitionError(
+            file,
+            stepPath,
+            `Step "${step.id}" invokes missing workflow "${step.workflow}"` +
+              (nearest ? ` — did you mean "${nearest}"?` : "."),
+          );
+        }
         return step;
+      }
     }
   });
 }

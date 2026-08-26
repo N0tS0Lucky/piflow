@@ -50,6 +50,16 @@ describe("invoke schema", () => {
     const dir = await writeDefsDir();
     await writeWorkflow(
       dir,
+      "helper",
+      `
+apiVersion: piflow/v1
+kind: workflow
+name: helper
+steps: []
+`,
+    );
+    await writeWorkflow(
+      dir,
       "main",
       `
 apiVersion: piflow/v1
@@ -117,5 +127,91 @@ steps:
 
     expect(error.file).toContain("main.yaml");
     expect(error.path).toBe("steps[0].workflow");
+  });
+});
+
+describe("invoke target resolution", () => {
+  it("rejects an invoke step naming a missing workflow", async () => {
+    const dir = await writeDefsDir();
+    await writeWorkflow(
+      dir,
+      "main",
+      `
+apiVersion: piflow/v1
+kind: workflow
+name: build-feature
+steps:
+  - id: implement
+    type: invoke
+    workflow: review-loop
+`,
+    );
+
+    const error = await captureDefinitionError(dir);
+
+    // Authoring UX: the message names the file, the step id, and the
+    // missing workflow name, so the author can go straight to the line.
+    expect(error.file).toContain("main.yaml");
+    expect(error.path).toBe("steps[0]");
+    expect(error.message).toContain("implement");
+    expect(error.message).toContain('"review-loop"');
+  });
+
+  it("rejects a missing invoke target nested in a parallel body", async () => {
+    const dir = await writeDefsDir();
+    await writeWorkflow(
+      dir,
+      "main",
+      `
+apiVersion: piflow/v1
+kind: workflow
+name: ship-it-all
+steps:
+  - id: fan-out
+    type: parallel
+    body:
+      - id: ship
+        type: invoke
+        workflow: open-pr
+`,
+    );
+
+    const error = await captureDefinitionError(dir);
+
+    expect(error.path).toBe("steps[0].body[0]");
+    expect(error.message).toContain("ship");
+    expect(error.message).toContain('"open-pr"');
+  });
+
+  it("suggests the closest known workflow name when the reference is misspelled", async () => {
+    const dir = await writeDefsDir();
+    await writeWorkflow(
+      dir,
+      "review-loop",
+      `
+apiVersion: piflow/v1
+kind: workflow
+name: review-loop
+steps: []
+`,
+    );
+    await writeWorkflow(
+      dir,
+      "main",
+      `
+apiVersion: piflow/v1
+kind: workflow
+name: build-feature
+steps:
+  - id: implement
+    type: invoke
+    workflow: review-lopo
+`,
+    );
+
+    const error = await captureDefinitionError(dir);
+
+    expect(error.path).toBe("steps[0]");
+    expect(error.message).toContain('did you mean "review-loop"');
   });
 });
