@@ -5,6 +5,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
+    "types": ["node"],
     "noEmitOnError": true,
     "declaration": true,
     "declarationMap": true,
