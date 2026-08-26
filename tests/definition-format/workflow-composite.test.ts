@@ -156,4 +156,51 @@ steps:
     expect(definitionError.path).toBe("steps[0].body");
     expect(definitionError.message).toMatch(/body|1/i);
   });
+
+  it("rejects a loop missing maxIterations with a path pointing at the loop", async () => {
+    const file = await writeTempYaml(`
+apiVersion: piflow/v1
+kind: workflow
+name: unbounded-loop
+steps:
+  - id: build-review-loop
+    type: loop
+    body:
+      - id: build
+        type: node
+        persona: builder
+`);
+
+    const err = await loadOne(file).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.file).toBe(file);
+    expect(definitionError.path).toBe("steps[0].maxIterations");
+    expect(definitionError.message).toMatch(/maxIterations|required|undefined/i);
+  });
+
+  it("rejects a loop with maxIterations less than 1", async () => {
+    const file = await writeTempYaml(`
+apiVersion: piflow/v1
+kind: workflow
+name: zero-loop
+steps:
+  - id: build-review-loop
+    type: loop
+    maxIterations: 0
+    body:
+      - id: build
+        type: node
+        persona: builder
+`);
+
+    const err = await loadOne(file).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.file).toBe(file);
+    expect(definitionError.path).toBe("steps[0].maxIterations");
+    expect(definitionError.message).toMatch(/1|maxIterations/i);
+  });
 });
