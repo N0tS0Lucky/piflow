@@ -1,10 +1,14 @@
+import { DefinitionError } from "./errors.js";
 import type { ExitWhen, Persona, Step, Workflow } from "./schema.js";
 
 /** Fully-parsed but not yet reference-resolved directory contents. */
 export type RawDefinitions = {
-  personas: Record<string, Persona>;
-  workflows: Record<string, Workflow>;
+  personas: Record<string, PersonaFile>;
+  workflows: Record<string, WorkflowFile>;
 };
+
+export type PersonaFile = { file: string; definition: Persona };
+export type WorkflowFile = { file: string; definition: Workflow };
 
 /**
  * Linked object graph — SPEC-definition-format.md, Validation rules.
@@ -44,39 +48,62 @@ export type ResolvedDefinitions = {
 };
 
 /** Attach the referenced persona to every session step at any nesting depth. */
-export function resolveDefinitions(
-  loaded: RawDefinitions,
-): ResolvedDefinitions {
+export function resolveDefinitions(raw: RawDefinitions): ResolvedDefinitions {
+  const personas: Record<string, Persona> = Object.fromEntries(
+    Object.entries(raw.personas).map(([name, entry]) => [
+      name,
+      entry.definition,
+    ]),
+  );
   return {
-    personas: loaded.personas,
+    personas,
     workflows: Object.fromEntries(
-      Object.entries(loaded.workflows).map(([name, workflow]) => [
+      Object.entries(raw.workflows).map(([name, entry]) => [
         name,
-        resolveWorkflow(workflow, loaded.personas),
+        resolveWorkflow(entry.file, entry.definition, personas),
       ]),
     ),
   };
 }
 
 function resolveWorkflow(
+  file: string,
   workflow: Workflow,
   personas: Record<string, Persona>,
 ): ResolvedWorkflow {
-  return { ...workflow, steps: resolveSteps(workflow.steps, personas) };
+  return {
+    ...workflow,
+    steps: resolveSteps(file, "steps", workflow.steps, personas),
+  };
 }
 
 function resolveSteps(
+  file: string,
+  path: string,
   steps: Step[],
   personas: Record<string, Persona>,
 ): ResolvedStep[] {
-  return steps.map((step) => {
+  return steps.map((step, index) => {
+    const stepPath = `${path}[${index}]`;
     switch (step.type) {
       case "node":
-      case "interactive":
-        return { ...step, persona: personas[step.persona]! };
+      case "interactive": {
+        const persona = personas[step.persona];
+        if (!persona) {
+          throw new DefinitionError(
+            file,
+            stepPath,
+            `Step "${step.id}" references missing persona "${step.persona}".`,
+          );
+        }
+        return { ...step, persona };
+      }
       case "loop":
       case "parallel":
-        return { ...step, body: resolveSteps(step.body, personas) };
+        return {
+          ...step,
+          body: resolveSteps(file, `${stepPath}.body`, step.body, personas),
+        };
     }
   });
 }

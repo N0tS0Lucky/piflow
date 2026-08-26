@@ -36,11 +36,16 @@ function isKind<K extends Kind>(
   return loaded.kind === kind;
 }
 
+type DefinitionFile<K extends Kind> = {
+  file: string;
+  definition: DefinitionOf<K>;
+};
+
 async function loadLibrary<K extends Kind>(
   dir: string,
   expectedKind: K,
-): Promise<Record<string, DefinitionOf<K>>> {
-  const collected: Record<string, DefinitionOf<K>> = {};
+): Promise<Record<string, DefinitionFile<K>>> {
+  const collected: Record<string, DefinitionFile<K>> = {};
   const filesByName = new Map<string, string>();
 
   for (const file of await listYaml(dir)) {
@@ -61,7 +66,7 @@ async function loadLibrary<K extends Kind>(
       );
     }
     filesByName.set(loaded.name, file);
-    collected[loaded.name] = loaded;
+    collected[loaded.name] = { file, definition: loaded };
   }
 
   return collected;

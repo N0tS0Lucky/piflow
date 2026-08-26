@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  DefinitionError,
   loadDefinitions,
   type Persona,
 } from "../../src/definition-format/index.js";
@@ -127,5 +128,35 @@ steps:
     if (buildAgain.type !== "node") return;
     expect(buildAgain.persona).toBe(graph.personas.builder);
     expect(buildAgain.worktree).toBe(true);
+  });
+
+  it("rejects a workflow step that names a missing persona", async () => {
+    const dir = await writeDefsDir();
+    await writeWorkflow(
+      dir,
+      `
+apiVersion: piflow/v1
+kind: workflow
+name: build-feature
+steps:
+  - id: assess-plan
+    persona: plan-assessor
+`,
+    );
+
+    let error: DefinitionError | undefined;
+    try {
+      await loadDefinitions(dir);
+    } catch (cause) {
+      error = cause as DefinitionError;
+    }
+
+    expect(error).toBeInstanceOf(DefinitionError);
+    // Authoring UX: the message names the workflow file, the step id, and the
+    // persona name, so the author can go straight to the offending line.
+    expect(error?.file).toContain("main.yaml");
+    expect(error?.path).toBe("steps[0]");
+    expect(error?.message).toContain("assess-plan");
+    expect(error?.message).toContain("plan-assessor");
   });
 });
