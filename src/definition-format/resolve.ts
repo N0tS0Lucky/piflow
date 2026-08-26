@@ -21,6 +21,13 @@ export type ResolvedSessionStep = {
   persona: Persona;
 };
 
+/** Unresolved until workflow resolution runs; slice 3 attaches the linked graph. */
+export type ResolvedInvokeStep = {
+  id: string;
+  type: "invoke";
+  workflow: string;
+};
+
 export type ResolvedLoopStep = {
   id: string;
   type: "loop";
@@ -36,7 +43,7 @@ export type ResolvedParallelStep = {
 };
 
 export type ResolvedStep =
-  ResolvedSessionStep | ResolvedLoopStep | ResolvedParallelStep;
+  ResolvedSessionStep | ResolvedInvokeStep | ResolvedLoopStep | ResolvedParallelStep;
 
 export type ResolvedWorkflow = Omit<Workflow, "steps"> & {
   steps: ResolvedStep[];
@@ -112,6 +119,8 @@ function resolveSteps(
           ...step,
           body: resolveSteps(file, `${stepPath}.body`, step.body, personas),
         };
+      case "invoke":
+        return step;
     }
   });
 }

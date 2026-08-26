@@ -81,9 +81,16 @@ function withDefaultNodeType(value: unknown): unknown {
   return value;
 }
 
+export const InvokeStepSchema = z.strictObject({
+  id: z.string(),
+  type: z.literal("invoke"),
+  workflow: z.string(),
+});
+
 /** Recursive step union. Session fields stay inferred; composites close the loop. */
 export type Step =
   | z.infer<typeof SessionStepSchema>
+  | z.infer<typeof InvokeStepSchema>
   | {
       id: string;
       type: "loop";
@@ -119,6 +126,7 @@ export const StepSchema: z.ZodType<Step> = z.preprocess(
       type: z.literal("parallel"),
       body: z.array(z.lazy(() => StepSchema)).min(1),
     }),
+    InvokeStepSchema,
   ]),
 );
 
