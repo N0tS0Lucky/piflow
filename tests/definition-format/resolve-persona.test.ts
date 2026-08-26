@@ -196,6 +196,27 @@ steps:
     expect(error.message).toContain('"toString"');
   });
 
+  it("suggests the closest known persona name when a reference is misspelled", async () => {
+    const dir = await writeDefsDir();
+    await writePersona(dir, "critic");
+    await writeWorkflow(
+      dir,
+      `
+apiVersion: piflow/v1
+kind: workflow
+name: build-feature
+steps:
+  - id: assess-plan
+    persona: critc
+`,
+    );
+
+    const error = await captureDefinitionError(dir);
+
+    expect(error.path).toBe("steps[0]");
+    expect(error.message).toContain('did you mean "critic"');
+  });
+
   it("rejects a missing persona inside a loop body, naming the nested path", async () => {
     const dir = await writeDefsDir();
     await writeWorkflow(

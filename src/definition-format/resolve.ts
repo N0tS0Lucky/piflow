@@ -1,4 +1,4 @@
-import { DefinitionError } from "./errors.js";
+import { DefinitionError, nearestKey } from "./errors.js";
 import type { ExitWhen, Persona, Step, Workflow } from "./schema.js";
 
 /** Fully-parsed but not yet reference-resolved directory contents. */
@@ -57,8 +57,12 @@ export function resolveDefinitions(raw: RawDefinitions): ResolvedDefinitions {
       entry.definition,
     ]),
   );
+  const personasRecord: Record<string, Persona> = Object.assign(
+    Object.create(null),
+    Object.fromEntries(personas),
+  );
   return {
-    personas: Object.fromEntries(personas),
+    personas: personasRecord,
     workflows: Object.fromEntries(
       Object.entries(raw.workflows).map(([name, entry]) => [
         name,
@@ -92,10 +96,12 @@ function resolveSteps(
       case "interactive": {
         const persona = personas.get(step.persona);
         if (!persona) {
+          const nearest = nearestKey(step.persona, [...personas.keys()]);
           throw new DefinitionError(
             file,
             stepPath,
-            `Step "${step.id}" references missing persona "${step.persona}".`,
+            `Step "${step.id}" references missing persona "${step.persona}"` +
+              (nearest ? ` — did you mean "${nearest}"?` : "."),
           );
         }
         return { ...step, persona };
