@@ -1,0 +1,7 @@
+apiVersion: piflow/v1
+kind: workflow
+name: write-docs
+steps:
+  - id: draft-docs
+    type: node
+    persona: doc-writer

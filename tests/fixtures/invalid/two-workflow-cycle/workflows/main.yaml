@@ -1,0 +1,8 @@
+# Two-workflow cycle: main -> helper -> main.
+apiVersion: piflow/v1
+kind: workflow
+name: main
+steps:
+  - id: call-helper
+    type: invoke
+    workflow: helper

@@ -1,0 +1,8 @@
+# Self-invoke: A -> A. Must fail cycle detection with the path listed.
+apiVersion: piflow/v1
+kind: workflow
+name: build-feature
+steps:
+  - id: recurse-forever
+    type: invoke
+    workflow: build-feature

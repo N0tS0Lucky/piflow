@@ -1,0 +1,8 @@
+# Three-workflow cycle: closes the loop back to alpha.
+apiVersion: piflow/v1
+kind: workflow
+name: gamma
+steps:
+  - id: go-alpha
+    type: invoke
+    workflow: alpha

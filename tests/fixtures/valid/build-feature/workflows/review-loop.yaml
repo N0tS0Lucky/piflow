@@ -1,0 +1,19 @@
+# SPEC-definition-format.md, Format Design — the reusable loop invoked above.
+apiVersion: piflow/v1
+kind: workflow
+name: review-loop
+steps:
+  - id: build-review-loop
+    type: loop
+    maxIterations: 6
+    exitWhen:
+      batonField: approved
+      equals: true
+    body:
+      - id: build
+        type: node
+        persona: builder
+        worktree: true
+      - id: review
+        type: node
+        persona: critic

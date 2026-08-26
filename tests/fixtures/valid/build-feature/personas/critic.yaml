@@ -1,0 +1,10 @@
+apiVersion: piflow/v1
+kind: persona
+name: critic
+description: Reviews the build output each loop iteration.
+skills: []
+tools:
+  allow: [read]
+  deny: [write]
+model: auto
+systemPromptAppend: You are the critic.

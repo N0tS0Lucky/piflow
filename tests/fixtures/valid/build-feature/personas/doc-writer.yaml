@@ -1,0 +1,10 @@
+apiVersion: piflow/v1
+kind: persona
+name: doc-writer
+description: Writes user-facing documentation.
+skills: []
+tools:
+  allow: [read, write]
+  deny: []
+model: auto
+systemPromptAppend: You are the doc writer.

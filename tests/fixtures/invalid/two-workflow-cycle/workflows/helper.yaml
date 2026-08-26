@@ -1,0 +1,8 @@
+# Two-workflow cycle: closes the loop back to main.
+apiVersion: piflow/v1
+kind: workflow
+name: helper
+steps:
+  - id: call-back-main
+    type: invoke
+    workflow: main
