@@ -72,7 +72,10 @@ describe("public API freeze", () => {
     const exported = [...source.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}/g)]
       .flatMap((block) =>
         block[1]!.split(",").map((name) =>
-          name.trim().replace(/^type\s+/, "").replace(/\s+as\s+.*$/, ""),
+          name
+            .trim()
+            .replace(/^type\s+/, "")
+            .replace(/\s+as\s+.*$/, ""),
         ),
       )
       .filter((name) => name.length > 0);
