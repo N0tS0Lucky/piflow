@@ -66,31 +66,85 @@ function nearestKey(
   return bestDistance <= SUGGESTION_DISTANCE ? best : undefined;
 }
 
-/** Object / array schemas we can walk to find the keys valid at a path. */
+/** Object / array / wrapper schemas we can walk to find the keys valid at a path. */
 type WalkableSchema = {
   readonly def: {
     readonly type?: string;
     readonly shape?: Record<string, WalkableSchema>;
     readonly element?: WalkableSchema;
+    readonly getter?: () => WalkableSchema;
+    readonly innerType?: WalkableSchema;
+    readonly out?: WalkableSchema;
+    readonly options?: readonly WalkableSchema[];
   };
 };
+
+/** Strip lazy / preprocess / optional wrappers until the inner schema is useful. */
+function unwrap(schema: WalkableSchema): WalkableSchema {
+  let node = schema;
+  for (;;) {
+    const def = node.def;
+    if (def.type === "lazy" && def.getter) {
+      node = def.getter();
+      continue;
+    }
+    if (def.type === "pipe" && def.out) {
+      node = def.out;
+      continue;
+    }
+    if (def.innerType) {
+      node = def.innerType;
+      continue;
+    }
+    return node;
+  }
+}
+
+function optionWithKey(
+  options: readonly WalkableSchema[],
+  key: string,
+): WalkableSchema | undefined {
+  return options.find((option) => unwrap(option).def.shape?.[key]);
+}
+
+function keysOf(schema: WalkableSchema): readonly string[] {
+  const node = unwrap(schema);
+  if (node.def.shape) return Object.keys(node.def.shape);
+  if (node.def.options) {
+    const keys = new Set<string>();
+    for (const option of node.def.options) {
+      for (const key of keysOf(option)) keys.add(key);
+    }
+    return [...keys];
+  }
+  return [];
+}
 
 /** Keys accepted by the object schema at `path`, or empty if that node is not an object. */
 function knownKeysAt(
   schema: WalkableSchema,
   path: readonly PropertyKey[],
 ): readonly string[] {
-  let node: WalkableSchema = schema;
+  let node: WalkableSchema = unwrap(schema);
   for (const part of path) {
+    node = unwrap(node);
     if (node.def.type === "array" && node.def.element) {
-      node = node.def.element;
+      node = unwrap(node.def.element);
       continue;
     }
-    const next = node.def.shape?.[String(part)];
+    const key = String(part);
+    if (node.def.options) {
+      const option = optionWithKey(node.def.options, key);
+      const next = option ? unwrap(option).def.shape?.[key] : undefined;
+      if (!next) return [];
+      node = next;
+      continue;
+    }
+    const next = node.def.shape?.[key];
     if (!next) return [];
     node = next;
   }
-  return node.def.shape ? Object.keys(node.def.shape) : [];
+  return keysOf(node);
 }
 
 /**

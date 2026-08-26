@@ -51,7 +51,7 @@ export type Persona = z.infer<typeof PersonaFields>;
 /**
  * `node` / `interactive` step — SPEC-definition-format.md, Step types.
  * `type` defaults to `node`; `worktree` defaults to `false`.
- * Loop / parallel / invoke land in later tasks.
+ * Invoke lands in a later task.
  */
 export const SessionStepSchema = z.strictObject({
   id: z.string(),
@@ -60,11 +60,52 @@ export const SessionStepSchema = z.strictObject({
   worktree: z.boolean().default(false),
 });
 
+/** Deterministic loop exit over the latest baton JSON. */
+export const ExitWhenSchema = z.strictObject({
+  batonField: z.string(),
+  equals: z.unknown(),
+});
+
+/**
+ * `loop` step. `body` is a non-empty nested step list; `maxIterations` >= 1.
+ * Recursive via `z.lazy` so bodies may contain further loops/parallels.
+ */
+export const LoopStepSchema = z.strictObject({
+  id: z.string(),
+  type: z.literal("loop"),
+  maxIterations: z.number().int().min(1),
+  exitWhen: ExitWhenSchema.optional(),
+  body: z.array(z.lazy(() => StepSchema)).min(1),
+});
+
+const StepUnionSchema = z.discriminatedUnion("type", [
+  SessionStepSchema,
+  LoopStepSchema,
+]);
+
+function withDefaultNodeType(value: unknown): unknown {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    !("type" in value)
+  ) {
+    return { ...value, type: "node" };
+  }
+  return value;
+}
+
+/**
+ * Discriminated unions require `type`. Omitted `type` still means `node`,
+ * so we fill it in before the discriminator runs.
+ */
+export const StepSchema = z.preprocess(withDefaultNodeType, StepUnionSchema);
+
 export const WorkflowSchema = z.strictObject({
   apiVersion: z.literal("piflow/v1"),
   kind: z.literal("workflow"),
   name: z.string(),
-  steps: z.array(SessionStepSchema),
+  steps: z.array(StepSchema),
 });
 
 export type Workflow = z.infer<typeof WorkflowSchema>;
