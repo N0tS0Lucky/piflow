@@ -1,10 +1,15 @@
 import { readFile } from "node:fs/promises";
 import { parse as parseYaml } from "yaml";
 import { DefinitionError, mapZodError } from "./errors.js";
-import { type Persona, PersonaSchema } from "./schema.js";
+import {
+  type Persona,
+  PersonaSchema,
+  type Workflow,
+  WorkflowSchema,
+} from "./schema.js";
 
-/** Load and validate a single persona definition file. */
-export async function loadOne(filePath: string): Promise<Persona> {
+/** Load and validate a single persona or workflow definition file. */
+export async function loadOne(filePath: string): Promise<Persona | Workflow> {
   let contents: string;
   try {
     contents = await readFile(filePath, "utf8");
@@ -19,11 +24,26 @@ export async function loadOne(filePath: string): Promise<Persona> {
     throw asDefinitionError(filePath, "Invalid YAML", cause);
   }
 
+  if (kindOf(data) === "workflow") {
+    const result = WorkflowSchema.safeParse(data);
+    if (!result.success) {
+      throw mapZodError(filePath, result.error, WorkflowSchema);
+    }
+    return result.data;
+  }
+
   const result = PersonaSchema.safeParse(data);
   if (!result.success) {
     throw mapZodError(filePath, result.error, PersonaSchema);
   }
   return result.data;
+}
+
+function kindOf(data: unknown): unknown {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    return undefined;
+  }
+  return "kind" in data ? data.kind : undefined;
 }
 
 /** DefinitionError is the only error type that leaves this module. */

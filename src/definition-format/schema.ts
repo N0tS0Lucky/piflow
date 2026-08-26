@@ -47,3 +47,24 @@ function requireExactlyOnePrompt(payload: z.core.ParsePayload<Persona>) {
 export const PersonaSchema = PersonaFields.check(requireExactlyOnePrompt);
 
 export type Persona = z.infer<typeof PersonaFields>;
+
+/**
+ * `node` / `interactive` step — SPEC-definition-format.md, Step types.
+ * `type` defaults to `node`; `worktree` defaults to `false`.
+ * Loop / parallel / invoke land in later tasks.
+ */
+export const SessionStepSchema = z.strictObject({
+  id: z.string(),
+  type: z.enum(["node", "interactive"]).default("node"),
+  persona: z.string(),
+  worktree: z.boolean().default(false),
+});
+
+export const WorkflowSchema = z.strictObject({
+  apiVersion: z.literal("piflow/v1"),
+  kind: z.literal("workflow"),
+  name: z.string(),
+  steps: z.array(SessionStepSchema),
+});
+
+export type Workflow = z.infer<typeof WorkflowSchema>;
