@@ -17,9 +17,7 @@ export type LoadedDefinitions = {
 };
 
 /** Load `personas/*.yaml` and `workflows/*.yaml` from a definitions directory. */
-export async function loadDefinitions(
-  dir: string,
-): Promise<LoadedDefinitions> {
+export async function loadDefinitions(dir: string): Promise<LoadedDefinitions> {
   return {
     personas: await loadLibrary(join(dir, "personas"), "persona"),
     workflows: await loadLibrary(join(dir, "workflows"), "workflow"),
