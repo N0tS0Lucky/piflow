@@ -203,4 +203,97 @@ steps:
     expect(definitionError.path).toBe("steps[0].maxIterations");
     expect(definitionError.message).toMatch(/1|maxIterations/i);
   });
+
+  it("loads a nested loop inside a parallel when otherwise valid", async () => {
+    const file = await writeTempYaml(`
+apiVersion: piflow/v1
+kind: workflow
+name: nested
+steps:
+  - id: fan-out
+    type: parallel
+    body:
+      - id: inner-loop
+        type: loop
+        maxIterations: 2
+        body:
+          - id: build
+            type: node
+            persona: builder
+      - id: docs
+        type: node
+        persona: writer
+`);
+
+    const workflow = await loadOne(file);
+
+    expect(workflow.kind).toBe("workflow");
+    if (workflow.kind !== "workflow") return;
+    expect(workflow.steps).toEqual([
+      {
+        id: "fan-out",
+        type: "parallel",
+        body: [
+          {
+            id: "inner-loop",
+            type: "loop",
+            maxIterations: 2,
+            body: [
+              {
+                id: "build",
+                type: "node",
+                persona: "builder",
+                worktree: false,
+              },
+            ],
+          },
+          {
+            id: "docs",
+            type: "node",
+            persona: "writer",
+            worktree: false,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("loads a nested parallel inside a loop when otherwise valid", async () => {
+    const file = await writeTempYaml(`
+apiVersion: piflow/v1
+kind: workflow
+name: nested-vice-versa
+steps:
+  - id: outer-loop
+    type: loop
+    maxIterations: 3
+    body:
+      - id: fan-out
+        type: parallel
+        body:
+          - id: ship
+            type: node
+            persona: shipper
+          - id: docs
+            type: node
+            persona: writer
+`);
+
+    const workflow = await loadOne(file);
+
+    expect(workflow.kind).toBe("workflow");
+    if (workflow.kind !== "workflow") return;
+    expect(workflow.steps).toHaveLength(1);
+    const [outer] = workflow.steps;
+    expect(outer).toMatchObject({
+      id: "outer-loop",
+      type: "loop",
+      maxIterations: 3,
+    });
+    if (outer?.type !== "loop") return;
+    expect(outer.body[0]).toMatchObject({
+      id: "fan-out",
+      type: "parallel",
+    });
+  });
 });
