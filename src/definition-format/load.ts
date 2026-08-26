@@ -40,10 +40,10 @@ export async function loadOne(filePath: string): Promise<Persona | Workflow> {
 }
 
 function kindOf(data: unknown): unknown {
-  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
     return undefined;
   }
-  return (data as { kind?: unknown }).kind;
+  return "kind" in data ? data.kind : undefined;
 }
 
 /** DefinitionError is the only error type that leaves this module. */

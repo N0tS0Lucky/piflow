@@ -42,6 +42,7 @@ steps:
 
     expect(workflow.apiVersion).toBe("piflow/v1");
     expect(workflow.kind).toBe("workflow");
+    if (workflow.kind !== "workflow") return;
     expect(workflow.name).toBe("build-feature");
     expect(workflow.steps).toEqual([
       {
