@@ -253,7 +253,26 @@ steps:
 
   it("allows the same step id in different enclosing lists", async () => {
     const dir = await writeDefsDir();
+    await mkdir(join(dir, "personas"));
     await mkdir(join(dir, "workflows"));
+    for (const name of ["planner", "builder"]) {
+      await writeFile(
+        join(dir, "personas", `${name}.yaml`),
+        `
+apiVersion: piflow/v1
+kind: persona
+name: ${name}
+description: Persona ${name}.
+skills: []
+tools:
+  allow: []
+  deny: []
+model: auto
+systemPromptAppend: Work.
+`,
+        "utf8",
+      );
+    }
     await writeFile(
       join(dir, "workflows", "reuse.yaml"),
       `

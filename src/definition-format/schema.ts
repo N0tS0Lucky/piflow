@@ -66,6 +66,9 @@ export const ExitWhenSchema = z.strictObject({
   equals: z.unknown(),
 });
 
+/** Classic loop exit shape, shared with the resolved graph types. */
+export type ExitWhen = z.infer<typeof ExitWhenSchema>;
+
 function withDefaultNodeType(value: unknown): unknown {
   if (
     typeof value === "object" &&
@@ -85,7 +88,7 @@ export type Step =
       id: string;
       type: "loop";
       maxIterations: number;
-      exitWhen?: z.infer<typeof ExitWhenSchema>;
+      exitWhen?: ExitWhen;
       body: Step[];
     }
   | {

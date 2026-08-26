@@ -50,7 +50,7 @@ export function levenshtein(a: string, b: string): number {
 const SUGGESTION_DISTANCE = 2;
 
 /** Closest known key within SUGGESTION_DISTANCE edits, if any. */
-function nearestKey(
+export function nearestKey(
   key: string,
   knownKeys: readonly string[],
 ): string | undefined {

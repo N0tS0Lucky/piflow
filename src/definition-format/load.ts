@@ -9,19 +9,21 @@ import {
   type Workflow,
   WorkflowSchema,
 } from "./schema.js";
+import {
+  resolveDefinitions,
+  type RawDefinitions,
+  type ResolvedDefinitions,
+} from "./resolve.js";
 
-/** Directory load result. Reference linking is a later task. */
-export type LoadedDefinitions = {
-  personas: Record<string, Persona>;
-  workflows: Record<string, Workflow>;
-};
-
-/** Load `personas/*.yaml` and `workflows/*.yaml` from a definitions directory. */
-export async function loadDefinitions(dir: string): Promise<LoadedDefinitions> {
-  return {
+/** Load `personas/*.yaml` + `workflows/*.yaml`, then resolve references. */
+export async function loadDefinitions(
+  dir: string,
+): Promise<ResolvedDefinitions> {
+  const raw: RawDefinitions = {
     personas: await loadLibrary(join(dir, "personas"), "persona"),
     workflows: await loadLibrary(join(dir, "workflows"), "workflow"),
   };
+  return resolveDefinitions(raw);
 }
 
 type Kind = Persona["kind"] | Workflow["kind"];
@@ -34,11 +36,16 @@ function isKind<K extends Kind>(
   return loaded.kind === kind;
 }
 
+type DefinitionFile<K extends Kind> = {
+  file: string;
+  definition: DefinitionOf<K>;
+};
+
 async function loadLibrary<K extends Kind>(
   dir: string,
   expectedKind: K,
-): Promise<Record<string, DefinitionOf<K>>> {
-  const collected: Record<string, DefinitionOf<K>> = {};
+): Promise<Record<string, DefinitionFile<K>>> {
+  const collected: Record<string, DefinitionFile<K>> = {};
   const filesByName = new Map<string, string>();
 
   for (const file of await listYaml(dir)) {
@@ -59,7 +66,7 @@ async function loadLibrary<K extends Kind>(
       );
     }
     filesByName.set(loaded.name, file);
-    collected[loaded.name] = loaded;
+    collected[loaded.name] = { file, definition: loaded };
   }
 
   return collected;
