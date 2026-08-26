@@ -127,4 +127,30 @@ systemPromptAppend: Be brief.
     expect(definitionError.message).toContain("critic.yaml");
     expect(definitionError.message).toContain("reviewer.yaml");
   });
+
+  it("rejects two workflows that share a name, naming both files", async () => {
+    const dir = await writeDefsDir();
+    await mkdir(join(dir, "workflows"));
+    const first = join(dir, "workflows", "review.yaml");
+    const second = join(dir, "workflows", "loop.yaml");
+    const yaml = `
+apiVersion: piflow/v1
+kind: workflow
+name: review-loop
+steps:
+  - id: review
+    type: node
+    persona: critic
+`;
+    await writeFile(first, yaml, "utf8");
+    await writeFile(second, yaml, "utf8");
+
+    const err = await loadDefinitions(dir).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.message).toContain("review-loop");
+    expect(definitionError.message).toContain("review.yaml");
+    expect(definitionError.message).toContain("loop.yaml");
+  });
 });

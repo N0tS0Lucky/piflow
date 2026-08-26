@@ -22,6 +22,7 @@ export async function loadDefinitions(
   const personas: Record<string, Persona> = {};
   const workflows: Record<string, Workflow> = {};
   const personaFiles = new Map<string, string>();
+  const workflowFiles = new Map<string, string>();
 
   for (const file of await listYaml(join(dir, "personas"))) {
     const loaded = await loadOne(file);
@@ -53,6 +54,15 @@ export async function loadDefinitions(
         `Expected kind "workflow" in workflows/, found "${loaded.kind}".`,
       );
     }
+    const previous = workflowFiles.get(loaded.name);
+    if (previous !== undefined) {
+      throw new DefinitionError(
+        file,
+        "name",
+        `Duplicate workflow name "${loaded.name}" (also defined in ${previous}).`,
+      );
+    }
+    workflowFiles.set(loaded.name, file);
     workflows[loaded.name] = loaded;
   }
 
