@@ -58,4 +58,44 @@ steps:
       },
     ]);
   });
+
+  it("defaults omitted type to node", async () => {
+    const file = await writeTempYaml(`
+apiVersion: piflow/v1
+kind: workflow
+name: assess
+steps:
+  - id: assess-plan
+    persona: plan-assessor
+    worktree: false
+`);
+
+    const workflow = await loadOne(file);
+
+    expect(workflow.kind).toBe("workflow");
+    if (workflow.kind !== "workflow") return;
+    expect(workflow.steps[0]).toMatchObject({
+      id: "assess-plan",
+      type: "node",
+      persona: "plan-assessor",
+    });
+  });
+
+  it("defaults omitted worktree to false", async () => {
+    const file = await writeTempYaml(`
+apiVersion: piflow/v1
+kind: workflow
+name: assess
+steps:
+  - id: assess-plan
+    type: node
+    persona: plan-assessor
+`);
+
+    const workflow = await loadOne(file);
+
+    expect(workflow.kind).toBe("workflow");
+    if (workflow.kind !== "workflow") return;
+    expect(workflow.steps[0]?.worktree).toBe(false);
+  });
 });
