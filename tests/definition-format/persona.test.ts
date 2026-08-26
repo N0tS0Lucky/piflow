@@ -59,4 +59,30 @@ describe("loadOne (persona)", () => {
     expect(definitionError.message).toContain("zzzqqqxxx");
     expect(definitionError.message).not.toContain("did you mean");
   });
+
+  it("rejects a persona carrying both prompt fields", async () => {
+    const file = resolve(fixtures, "invalid/persona-both-prompts.yaml");
+
+    const err = await loadOne(file).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.path).toBe(""); // whole-file rule
+    expect(definitionError.message).toMatch(/exactly one/i);
+    expect(definitionError.message).toContain("systemPromptReplace");
+    expect(definitionError.message).toContain("systemPromptAppend");
+  });
+
+  it("rejects a persona carrying neither prompt field", async () => {
+    const file = resolve(fixtures, "invalid/persona-no-prompt.yaml");
+
+    const err = await loadOne(file).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DefinitionError);
+    const definitionError = err as DefinitionError;
+    expect(definitionError.path).toBe(""); // whole-file rule
+    expect(definitionError.message).toMatch(/exactly one/i);
+    expect(definitionError.message).toContain("systemPromptReplace");
+    expect(definitionError.message).toContain("systemPromptAppend");
+  });
 });
